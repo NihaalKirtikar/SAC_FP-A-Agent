@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────
+# Secrets — NEVER commit. Each developer keeps their own .env locally.
+# ─────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# ─────────────────────────────────────────────────────────────
+# Flat-file integration — data stays on the local machine only.
+# ─────────────────────────────────────────────────────────────
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.tsv
+/data/
+saved_multi_actions.json
+
+# ─────────────────────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# ─────────────────────────────────────────────────────────────
+# OS / editor
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
