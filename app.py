@@ -837,6 +837,143 @@ def cap_actuals():
 
 
 # ============================================================================
+# CAPABILITY — MASTER DATA UPDATE (Data Import Service: dimension members)
+# ============================================================================
+# The exact master-data import path varies by tenant / API version, so we try
+# the known variants (mirrors the # CONFIRM pattern used elsewhere in this app).
+_MD_JOB_PATHS = [
+    "/api/v1/dataimport/models/{mid}/masterData/{dim}",
+    "/api/v1/dataimport/models/{mid}/masterdata/{dim}",
+    "/api/v1/dataimport/models/{mid}/dimensions/{dim}/masterData",
+]   # CONFIRM endpoint
+
+
+def create_master_data_job(c, mid, dim):
+    """Create a master-data import job for one dimension. Tries the known
+    endpoint variants and returns (job_id, info, path_used)."""
+    last = {}
+    for tmpl in _MD_JOB_PATHS:
+        path = tmpl.format(mid=mid, dim=dim)
+        r = c.post(path)
+        raw = _safe_json(r)
+        last = {"path": path, "http": r.status_code, "body": r.text[:600]}
+        if r.status_code in (200, 201, 202):
+            job_id = raw.get("jobID") or raw.get("jobId")          # CONFIRM key
+            if job_id:
+                return job_id, last, path
+    return None, last, None
+
+
+def cap_master_data():
+    st.subheader("Master Data Update")
+    st.caption("Create or update the **members of one dimension** from a flat file "
+               "(CSV) via the SAC Data Import Service — IDs, descriptions, "
+               "hierarchies and properties. This does not write fact data.")
+    mid = effective_model_id()
+    if not need(mid):
+        st.error("PREREQUISITE MISSING — choose a model on the **Models** tab "
+                 "(or set SAC_MODEL_ID in .env)."); return
+
+    # ---- choose the dimension ---------------------------------------------
+    if st.button("📥 Load this model's dimensions"):
+        c = client()
+        try:
+            cols, meta = fetch_model_columns(c, mid)
+            st.session_state["md_dims"] = cols
+            st.session_state["md_dims_raw"] = meta
+        except Exception as e:
+            st.session_state["md_dims"] = []
+            st.session_state["md_dims_raw"] = {"error": str(e)}
+
+    if st.session_state.get("md_dims") == []:
+        st.warning("Couldn't read this model's dimensions automatically — you can "
+                   "still type the dimension ID manually below.")
+        with st.expander("Raw model metadata"):
+            st.write(st.session_state.get("md_dims_raw"))
+
+    dims = st.session_state.get("md_dims") or []
+    MANUAL = "✏️  type the dimension ID manually"
+    options = (dims + [MANUAL]) if dims else [MANUAL]
+    pick = st.selectbox("Dimension to update", options, key="md_dim_pick")
+    dim = (st.text_input("Dimension ID", key="md_dim_text").strip()
+           if pick == MANUAL else pick)
+    if not dim:
+        st.info("Pick a dimension above (or 📥 load them), then upload your file.")
+        return
+
+    # ---- upload + preview --------------------------------------------------
+    up = st.file_uploader("Upload master-data CSV", type=["csv"], key="md_file")
+    if not up:
+        st.info("File headers must match the dimension's member field IDs — at "
+                "minimum the member **ID** column, plus optional **Description**, a "
+                "parent/**hierarchy** column, and any property columns.")
+        return
+
+    df = pd.read_csv(up, dtype=str).fillna("")
+    st.caption(f"{len(df):,} rows × {len(df.columns)} columns detected.")
+    st.dataframe(df, use_container_width=True, height=380)
+
+    cols = list(df.columns)
+    id_col = st.selectbox("Which column holds the member ID?", cols, key="md_id_col")
+
+    with st.expander("➕ Set a constant value on every row (optional, e.g. a hierarchy)"):
+        cc_name = st.text_input("Column name", key="md_cc_name").strip()
+        cc_val = st.text_input("Value for every row", key="md_cc_val")
+
+    st.markdown("---")
+    if st.button("Validate & Update Master Data", type="primary"):
+        c = client()
+        if id_col not in df.columns:
+            st.error("Pick the member ID column first."); return
+        send_df = df.copy()
+        if cc_name:
+            send_df[cc_name] = cc_val
+        rows = send_df.to_dict(orient="records")
+        prog = JobProgress(f"Updating master data for '{dim}' …")
+        try:
+            prog.step("Creating master-data job…", emoji="🆕")
+            job_id, info, used = create_master_data_job(c, mid, dim)
+            prog.log(f"create job → {info}")
+            if not job_id:
+                prog.finish(False, "Couldn't create a master-data job (see log).")
+                st.error("SAC didn't accept a master-data import job at any known "
+                         "endpoint — this path is tenant-specific. Send me the log "
+                         "above and I'll wire the exact endpoint your tenant uses.")
+                return
+            prog.log(f"Job ID: {job_id}  (via {used})")
+
+            prog.step(f"Uploading {len(rows):,} member(s)…", emoji="⬆️")
+            r_up = c.post(f"/api/v1/dataimport/jobs/{job_id}",
+                          json={"Members": rows})                     # CONFIRM wrapper
+            upj = _safe_json(r_up)
+            prog.log(f"upload → HTTP {r_up.status_code}: {r_up.text[:600]}")
+            failed_n = upj.get("failedNumberRows", 0)
+            upserted_n = upj.get("upsertedNumberRows")
+            if r_up.status_code not in (200, 201, 202) or failed_n or upserted_n == 0:
+                report_rejected_rows(prog, upj, r_up, failed_n)
+                return
+            prog.log(f"{upserted_n} member(s) accepted, {failed_n} failed")
+
+            prog.step("Submitting update run…", emoji="🚀")
+            r_run = c.post(f"/api/v1/dataimport/jobs/{job_id}/run")
+            prog.log(f"run → HTTP {r_run.status_code}: {r_run.text[:300]}")
+            if r_run.status_code not in (200, 201, 202):
+                prog.finish(False, f"SAP did not start the update (HTTP {r_run.status_code}).")
+                st.error(f"The run was rejected. Response:\n\n{r_run.text[:600]}")
+                return
+
+            res = poll_job(c, f"/api/v1/dataimport/jobs/{job_id}/status", progress=prog)
+            ok = res["status"] == "done"
+            prog.finish(ok, "Master data updated successfully" if ok
+                        else f"Update {res['status']} — see log below")
+            with st.expander("Final server response"):
+                st.write(res["detail"])
+        except Exception as e:
+            prog.finish(False, "Unexpected error — see log")
+            st.exception(e)
+
+
+# ============================================================================
 # CAPABILITY 3 — VERSION INITIALIZATION (Multi Action)
 # ============================================================================
 def run_multi_action(c, ma_id, parameters, progress=None):
@@ -1381,6 +1518,7 @@ ALL_PAGES = {
     "Connect": ("🔌", cap_connect),
     "Models": ("📦", cap_models),
     "Ingest Actuals": ("⬆️", cap_actuals),
+    "Master Data": ("🧬", cap_master_data),
     "Version Initialization": ("🔁", cap_version_init),
     "Run Data Action": ("⚙️", cap_other_das),
     "Driver Inputs": ("🎚️", cap_drivers),
