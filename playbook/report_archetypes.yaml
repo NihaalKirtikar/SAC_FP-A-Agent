@@ -1,0 +1,120 @@
+# ============================================================================
+# REPORT ARCHETYPES — playbook v1
+#
+# Named, reusable table-builder configurations for common management-
+# reporting asks. NOT auto-applied — these are reference/suggestion data a
+# future UI feature ("Start from a template") could read to pre-fill a new
+# table's row/col/measure/presentation choices; the user still confirms
+# every field, same "rules before AI, never silently assume" principle as
+# the rest of this app. For now, treat this file as a checklist: "what does
+# a complete Income Statement Review actually need to cover?"
+#
+# `suggested_tables` describes, per table, the DIMENSION ROLE to fill (not a
+# literal column name — every tenant's dimensions are named differently) and
+# which KPI/gl_taxonomy ids from the other two files are typically relevant.
+# ============================================================================
+
+generic:
+  - id: income_statement_review
+    label: "Income statement variance review"
+    when_to_use: "Monthly/quarterly P&L review — Actual vs Budget/Forecast, revenue through EBITDA."
+    suggested_tables:
+      - title: "Revenue by segment/product"
+        row_dim_role: "revenue-generating dimension (product, region, channel, customer segment)"
+        measure_kpis: [revenue_growth_pct]
+        comparison: "Budget or Prior Year"
+        presentation: "Auto (usually bar; Composition if reviewing revenue mix)"
+      - title: "Opex by category"
+        row_dim_role: "cost-centre or GL-account-group dimension"
+        measure_kpis: [opex_ratio_pct]
+        comparison: "Budget"
+        presentation: "Driver / contribution analysis"
+      - title: "EBITDA bridge"
+        row_dim_role: "revenue and major cost lines together"
+        measure_kpis: [ebitda_margin_pct]
+        comparison: "Budget or Prior Year"
+        presentation: "Variance waterfall"
+
+  - id: balance_sheet_summary
+    label: "Balance sheet summary"
+    when_to_use: "Periodic balance-sheet health check for leadership/board."
+    suggested_tables:
+      - title: "Assets by category"
+        row_dim_role: "asset-type dimension (cash, receivables, inventory, PP&E, intangibles)"
+        measure_kpis: [current_ratio]
+        comparison: "Prior period"
+        presentation: "Auto"
+      - title: "Liabilities & equity by category"
+        row_dim_role: "liability/equity-type dimension"
+        measure_kpis: [debt_to_equity]
+        comparison: "Prior period"
+        presentation: "Auto"
+
+  - id: working_capital_review
+    label: "Working capital / cash review"
+    when_to_use: "Cash-flow-sensitive reviews — retail, manufacturing, or any working-capital-intensive business."
+    suggested_tables:
+      - title: "Receivables & payables aging or trend"
+        row_dim_role: "customer/vendor or aging-bucket dimension"
+        measure_kpis: [dso_days, working_capital]
+        comparison: "Prior period"
+        presentation: "Line (if a time dimension is available)"
+
+  - id: capex_review
+    label: "Capex / asset investment review"
+    when_to_use: "Reviewing capital spend plans vs approvals/actuals."
+    suggested_tables:
+      - title: "Capex by asset class or project"
+        row_dim_role: "asset-class or project dimension"
+        measure_kpis: [capex_utilization_pct, capex_intensity_pct]
+        comparison: "Budget (sanctioned plan)"
+        presentation: "Composition (parts of a whole) or Driver analysis"
+
+# ----------------------------------------------------------------------------
+# INDUSTRY: Utilities — Indian power Distribution Company ("Discom").
+# ----------------------------------------------------------------------------
+utilities_discom:
+  - id: discom_regulatory_performance_review
+    label: "Discom regulatory performance review"
+    when_to_use: "Board or regulator-facing review of loss reduction and collection performance."
+    suggested_tables:
+      - title: "AT&C loss trend"
+        row_dim_role: "time dimension (month/quarter), optionally split by circle/division"
+        measure_kpis: [atc_loss_pct]
+        comparison: "Prior Year or regulatory target"
+        presentation: "Line (time-series)"
+      - title: "Collection efficiency by circle/division"
+        row_dim_role: "operating circle/division dimension"
+        measure_kpis: [collection_efficiency_pct]
+        comparison: "Prior period"
+        presentation: "Auto (bar) or Driver analysis to find the weakest circles"
+
+  - id: discom_revenue_requirement_review
+    label: "Revenue requirement & tariff gap review"
+    when_to_use: "Reviewing ARR vs realised revenue and the cost-to-serve gap — typically a CFO/regulatory-affairs deck."
+    suggested_tables:
+      - title: "ARR vs actual revenue realised"
+        row_dim_role: "time dimension or consumer/tariff category"
+        measure_kpis: [revenue_gap]
+        comparison: "Budget (ARR as the 'budget' side)"
+        presentation: "Variance waterfall"
+      - title: "ACS-ACoE gap trend"
+        row_dim_role: "time dimension"
+        measure_kpis: [acs_acoe_gap]
+        comparison: "Prior period"
+        presentation: "Line"
+
+  - id: discom_asset_capex_review
+    label: "Regulatory asset base & capex review"
+    when_to_use: "Reviewing how approved capex is growing the regulated asset base — matches models like SAC_Revenue_Planning_Discom_Asset."
+    suggested_tables:
+      - title: "RAB growth by asset category"
+        row_dim_role: "asset-category dimension"
+        measure_kpis: [rab_growth_pct]
+        comparison: "Prior period or regulator-approved plan"
+        presentation: "Auto or Composition"
+      - title: "Capex utilisation vs sanctioned plan"
+        row_dim_role: "project or asset-class dimension"
+        measure_kpis: [capex_utilization_pct]
+        comparison: "Budget (sanctioned plan)"
+        presentation: "Driver / contribution analysis"

@@ -1,0 +1,46 @@
+# Master-data COLUMN-ROLE mapping for the Insights & Reporting Filters ⋮ menu
+# (the "Show ID + Description" / "Show as hierarchy" lookups).
+#
+# WHY THIS FILE EXISTS: different SAC tenants/models name these columns
+# differently ("Description" vs "Text" vs "ShortText" vs something else
+# entirely). Rather than guessing a new hardcoded pattern in Python every
+# time one model's naming doesn't match the defaults below, THIS is the one
+# place to fix it — for good, for every dimension that shares the same
+# naming, with no code change ever needed again.
+#
+# Two ways to add an override:
+#   1. In-app (recommended): Filters (optional) -> a dimension's ⋮ menu ->
+#      "Show raw columns (debug)" -> pick the real column from the dropdowns
+#      shown there and hit Save. It writes here automatically (NOTE: an
+#      in-app save rewrites this whole file — a short header comment survives,
+#      but any OTHER comment you added by hand won't; see sac_dim_config.py).
+#   2. By hand: add an entry under `overrides:` below, e.g.
+#        overrides:
+#          GL_Account:
+#            description_column: AccountText
+#          Cost_Center:
+#            description_column: CCText
+#            parent_column: ParentCC
+#
+# Dimension names under `overrides` are matched case-insensitively. Leave a
+# role out (or the whole file at defaults) to keep auto-detecting via the
+# pattern lists below.
+
+defaults:
+  description_column_patterns:
+    - description
+    - text
+    - shorttext
+    - mediumtext
+    - longtext
+    - name
+  parent_column_patterns:
+    - parentid
+    - parent
+    - parentmember
+    - parentmemberid
+    - parentnode
+    - parentnodeid
+    - hierarchyparent
+
+overrides: {}

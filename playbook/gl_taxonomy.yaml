@@ -1,0 +1,225 @@
+# ============================================================================
+# GL / ACCOUNT TAXONOMY — playbook v1
+#
+# Purpose: map an account/GL/measure NAME to (a) its financial-statement
+# category, (b) its DEFAULT favourability direction, and (c) short guidance
+# a narrative-writing LLM can use. This is REFERENCE DATA the app's code
+# queries — it never talks to an LLM by itself, and it never overrides the
+# user's own explicit Cost/Revenue declaration in the table builder. Its
+# only two jobs are: (1) power a "did you mean...?" SUGGESTION when a user
+# adds a measure (still requires their confirmation — never silently
+# assumed, per this app's "rules before AI, never guess a KPI's meaning"
+# design principle), and (2) supply a small, relevant excerpt to the AI
+# narrative prompt so it uses real FP&A vocabulary instead of generic text.
+#
+# `patterns` are case-insensitive substrings matched against the measure's
+# column name AND, if available, its GL account description. They are
+# DELIBERATELY generic/English-centric starting points — every tenant's
+# actual chart of accounts will differ; treat this as a seed to extend, not
+# a fixed answer. `favourability` is one of: revenue | cost | asset |
+# liability | equity | neutral (neutral = direction is context-dependent;
+# never auto-assumed).
+#
+# Sections: "generic" (any industry, standard income-statement / balance-
+# sheet structure) and "utilities_discom" (India power-distribution-company
+# specific — see report_archetypes.yaml and style_guide.md for how/when
+# this section is pulled in). Add further industry sections the same shape.
+# ============================================================================
+
+generic:
+  revenue:
+    - id: revenue_product
+      label: "Product / goods revenue"
+      favourability: revenue
+      patterns: ["product revenue", "goods revenue", "sales revenue", "gross sales"]
+      note: "Core top-line. Favourable when actual/forecast exceeds budget/prior period."
+    - id: revenue_service
+      label: "Service revenue"
+      favourability: revenue
+      patterns: ["service revenue", "services income", "subscription revenue", "recurring revenue"]
+      note: "Recurring/subscription revenue is usually read alongside a retention or churn metric."
+    - id: revenue_other
+      label: "Other operating income"
+      favourability: revenue
+      patterns: ["other income", "other operating income", "miscellaneous income"]
+      note: "Usually small; a sudden spike is worth flagging as an anomaly, not a trend."
+    - id: revenue_deductions
+      label: "Sales deductions (returns, discounts, rebates)"
+      favourability: cost
+      patterns: ["sales returns", "sales discount", "rebate", "chargeback", "allowance for returns"]
+      note: "A contra-revenue line — INCREASING is unfavourable even though it sits in the revenue block."
+
+  cost_of_goods_sold:
+    - id: cogs_materials
+      label: "Direct materials / cost of goods sold"
+      favourability: cost
+      patterns: ["cogs", "cost of goods sold", "cost of sales", "raw material cost", "direct material"]
+      note: "Track alongside revenue for gross margin — a rising COGS ratio matters more than the absolute number."
+    - id: cogs_labor
+      label: "Direct labour"
+      favourability: cost
+      patterns: ["direct labor", "direct labour", "production labor cost"]
+      note: null
+    - id: cogs_freight
+      label: "Freight / logistics (cost of sales)"
+      favourability: cost
+      patterns: ["freight cost", "logistics cost", "shipping cost", "distribution cost (cogs)"]
+      note: null
+
+  opex:
+    - id: opex_payroll
+      label: "Payroll / employee cost"
+      favourability: cost
+      patterns: ["payroll", "salaries", "employee cost", "compensation expense", "wages", "benefits expense"]
+      note: "Usually the largest opex line in service businesses — pair with headcount for a per-FTE read."
+    - id: opex_admin
+      label: "General & administrative"
+      favourability: cost
+      patterns: ["g&a", "general and administrative", "admin expense", "office expense"]
+      note: null
+    - id: opex_marketing
+      label: "Sales & marketing"
+      favourability: cost
+      patterns: ["marketing expense", "advertising expense", "s&m", "sales and marketing"]
+      note: "A rising S&M spend alongside rising revenue may be efficient, not unfavourable — check the ratio, not just the absolute variance."
+    - id: opex_rnd
+      label: "Research & development"
+      favourability: cost
+      patterns: ["r&d expense", "research and development", "product development cost"]
+      note: "Chronic underspend vs budget can itself be a risk signal (delayed roadmap), not automatically 'favourable'."
+    - id: opex_it
+      label: "IT / technology"
+      favourability: cost
+      patterns: ["it expense", "technology cost", "software subscription", "cloud hosting cost"]
+      note: null
+    - id: opex_facilities
+      label: "Facilities / occupancy"
+      favourability: cost
+      patterns: ["rent expense", "occupancy cost", "facilities cost", "utilities expense (office)"]
+      note: null
+    - id: opex_depreciation
+      label: "Depreciation & amortisation"
+      favourability: cost
+      patterns: ["depreciation", "amortisation", "amortization", "d&a"]
+      note: "Non-cash — material for EBITDA vs EBIT framing; call this out explicitly if both appear in the same table."
+
+  assets:
+    - id: asset_cash
+      label: "Cash & cash equivalents"
+      favourability: asset
+      patterns: ["cash and cash equivalents", "cash balance", "bank balance"]
+      note: null
+    - id: asset_receivables
+      label: "Accounts receivable"
+      favourability: asset
+      patterns: ["accounts receivable", "trade receivable", "debtors"]
+      note: "Growing receivables is only 'good' if revenue is growing proportionally faster than DSO — flag if receivables outgrow revenue."
+    - id: asset_inventory
+      label: "Inventory"
+      favourability: asset
+      patterns: ["inventory", "stock in trade", "finished goods", "raw material stock"]
+      note: "Rising inventory without matching sales growth is a working-capital risk, not a straightforward asset gain."
+    - id: asset_ppe
+      label: "Property, plant & equipment"
+      favourability: asset
+      patterns: ["property plant and equipment", "ppe", "fixed assets", "capital assets"]
+      note: "Usually moves via capex additions minus depreciation — read alongside the capex plan."
+    - id: asset_intangibles
+      label: "Intangible assets / goodwill"
+      favourability: asset
+      patterns: ["intangible assets", "goodwill", "capitalised software"]
+      note: null
+    - id: asset_investments
+      label: "Investments"
+      favourability: asset
+      patterns: ["short term investments", "long term investments", "marketable securities"]
+      note: null
+
+  liabilities:
+    - id: liability_payables
+      label: "Accounts payable"
+      favourability: liability
+      patterns: ["accounts payable", "trade payable", "creditors"]
+      note: "A RISING payables balance can be favourable for cash (working-capital benefit) even though it's technically a liability increase — note the tension explicitly rather than defaulting to 'liabilities up = bad'."
+    - id: liability_debt_short
+      label: "Short-term debt / current borrowings"
+      favourability: liability
+      patterns: ["short term debt", "current borrowings", "short term loan"]
+      note: null
+    - id: liability_debt_long
+      label: "Long-term debt"
+      favourability: liability
+      patterns: ["long term debt", "long term borrowings", "term loan", "bonds payable"]
+      note: null
+    - id: liability_accrued
+      label: "Accrued liabilities"
+      favourability: liability
+      patterns: ["accrued expense", "accrued liability", "provisions"]
+      note: null
+
+  equity:
+    - id: equity_retained_earnings
+      label: "Retained earnings"
+      favourability: asset
+      patterns: ["retained earnings", "accumulated profit"]
+      note: null
+    - id: equity_share_capital
+      label: "Share capital / paid-in capital"
+      favourability: neutral
+      patterns: ["share capital", "paid in capital", "common stock"]
+      note: "A change here is usually a financing event (issuance/buyback), not an operating result — don't apply operating favourability logic."
+
+# ----------------------------------------------------------------------------
+# INDUSTRY: Utilities — Indian power Distribution Company ("Discom").
+# Anchored on this app's own live model (SAC_Revenue_Planning_Discom_Asset):
+# revenue planning tied to a regulated asset base. Terminology below is
+# standard for Indian electricity-distribution regulation (State Electricity
+# Regulatory Commission / SERC tariff-order framework) — validate exact
+# formulas against the specific regulator's tariff order, they vary by state.
+# ----------------------------------------------------------------------------
+utilities_discom:
+  revenue_regulatory:
+    - id: discom_arr
+      label: "Annual Revenue Requirement (ARR)"
+      favourability: neutral
+      patterns: ["annual revenue requirement", "arr"]
+      note: "The revenue a Discom is ALLOWED to recover per its regulator-approved tariff order (opex + depreciation + return on regulated asset base). Not the same as billed/collected revenue — the gap between the two is the 'revenue gap', see KPI library."
+    - id: discom_rab
+      label: "Regulatory Asset Base (RAB)"
+      favourability: neutral
+      patterns: ["regulatory asset base", "rab", "regulated asset base"]
+      note: "The asset value on which the regulator allows a return. RAB growth (via approved capex) generally increases allowed revenue — favourable for the entity's ARR, but explain this as a REGULATORY mechanism, not generic 'assets grew so it's good'."
+    - id: discom_subsidy
+      label: "Subsidy booked / received (government)"
+      favourability: neutral
+      patterns: ["subsidy booked", "subsidy received", "government subsidy", "tariff subsidy"]
+      note: "Many Discoms (esp. state-owned) get subsidy for below-cost categories (e.g. agricultural power). Booked vs actually RECEIVED is the material gap to flag, not the absolute amount."
+
+  cost_regulatory:
+    - id: discom_power_purchase
+      label: "Power purchase cost"
+      favourability: cost
+      patterns: ["power purchase cost", "cost of power purchased", "energy purchase cost"]
+      note: "Usually 70-80% of a Discom's total cost — the single largest and most volatile cost line (fuel/PPA price pass-through). A small % change here often dwarfs every other cost variance in the model."
+
+  operational_kpis:
+    - id: discom_atc_loss
+      label: "AT&C losses (Aggregate Technical & Commercial)"
+      favourability: cost
+      patterns: ["at&c loss", "atc loss", "aggregate technical and commercial loss"]
+      note: "% of energy input never billed+collected — combines technical (network) loss and commercial (theft/billing/collection) loss. DECREASING is favourable. This is the headline efficiency KPI regulators track for Discoms."
+    - id: discom_td_loss
+      label: "T&D losses (Transmission & Distribution, technical)"
+      favourability: cost
+      patterns: ["t&d loss", "td loss", "transmission and distribution loss", "technical loss"]
+      note: "The purely technical (physics-based network) component of AT&C loss. Decreasing is favourable."
+    - id: discom_collection_efficiency
+      label: "Collection efficiency"
+      favourability: revenue
+      patterns: ["collection efficiency"]
+      note: "Billed amount actually COLLECTED as % of billed amount. Increasing is favourable — the commercial half of AT&C loss."
+    - id: discom_billing_efficiency
+      label: "Billing efficiency"
+      favourability: revenue
+      patterns: ["billing efficiency"]
+      note: "Energy BILLED as % of energy input (after technical loss). Increasing is favourable."

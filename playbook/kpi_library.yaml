@@ -1,0 +1,152 @@
+# ============================================================================
+# KPI FORMULA LIBRARY — playbook v1
+#
+# Each entry: id, label, category, formula (in words — this app never
+# auto-computes a KPI from this file; it's grounding text for the narrative
+# prompt and a reference for the user, not an executable formula engine),
+# favourability, typical presentation (maps to sac_insights chart-selection
+# rules), and a short note. `gl_refs` lists gl_taxonomy ids the KPI draws on
+# — used to decide which KPI entries are relevant to a given table.
+# ============================================================================
+
+generic:
+  profitability:
+    - id: gross_margin_pct
+      label: "Gross margin %"
+      formula: "(Revenue − COGS) / Revenue × 100"
+      favourability: revenue
+      presentation: line_or_bar
+      gl_refs: [revenue_product, cogs_materials]
+      note: "Watch the RATIO over time, not just absolute gross profit — margin compression can hide behind rising revenue."
+    - id: ebitda_margin_pct
+      label: "EBITDA margin %"
+      formula: "(Revenue − COGS − Opex, excl. D&A and interest/tax) / Revenue × 100"
+      favourability: revenue
+      presentation: line_or_bar
+      gl_refs: [revenue_product, cogs_materials, opex_payroll]
+      note: "Board/CEO decks almost always lead with this over raw EBITDA — always pair the number with the margin %."
+    - id: opex_ratio_pct
+      label: "Opex ratio (Opex / Revenue) %"
+      formula: "Total Opex / Revenue × 100"
+      favourability: cost
+      presentation: bar
+      gl_refs: [opex_payroll, opex_admin, opex_marketing]
+      note: "A DECREASING ratio is favourable even if absolute opex grows, as long as it grows slower than revenue."
+
+  growth_and_variance:
+    - id: revenue_growth_pct
+      label: "Revenue growth % (YoY or vs prior period)"
+      formula: "(Current period revenue − Prior period revenue) / Prior period revenue × 100"
+      favourability: revenue
+      presentation: line
+      gl_refs: [revenue_product]
+      note: null
+    - id: budget_variance_pct
+      label: "Budget variance %"
+      formula: "(Actual − Budget) / |Budget| × 100"
+      favourability: neutral
+      presentation: driver_bar
+      gl_refs: []
+      note: "Direction of 'favourable' depends entirely on whether the line is revenue-type or cost-type — never assume."
+    - id: forecast_accuracy_pct
+      label: "Forecast accuracy %"
+      formula: "100 − (|Actual − Forecast| / |Forecast| × 100)"
+      favourability: revenue
+      presentation: line
+      gl_refs: []
+      note: "Persistently low accuracy on one line is itself a planning-process finding, worth flagging even without a 'bad number'."
+
+  liquidity_and_leverage:
+    - id: current_ratio
+      label: "Current ratio"
+      formula: "Current Assets / Current Liabilities"
+      favourability: asset
+      presentation: line
+      gl_refs: [asset_cash, asset_receivables, asset_inventory, liability_payables]
+      note: "A ratio well above ~2 can indicate idle cash/working capital, not purely 'good' — context-dependent, don't over-praise a high number."
+    - id: working_capital
+      label: "Working capital"
+      formula: "Current Assets − Current Liabilities"
+      favourability: asset
+      presentation: line
+      gl_refs: [asset_receivables, asset_inventory, liability_payables]
+      note: null
+    - id: dso_days
+      label: "Days Sales Outstanding (DSO)"
+      formula: "(Accounts Receivable / Revenue) × Number of days in period"
+      favourability: cost
+      presentation: line
+      gl_refs: [asset_receivables, revenue_product]
+      note: "DECREASING DSO is favourable (faster collection)."
+    - id: debt_to_equity
+      label: "Debt-to-equity ratio"
+      formula: "Total Debt / Total Equity"
+      favourability: liability
+      presentation: line
+      gl_refs: [liability_debt_short, liability_debt_long, equity_retained_earnings]
+      note: null
+
+  capital:
+    - id: capex_intensity_pct
+      label: "Capex intensity (Capex / Revenue) %"
+      formula: "Capital Expenditure / Revenue × 100"
+      favourability: neutral
+      presentation: bar
+      gl_refs: [asset_ppe]
+      note: "Direction of 'favourable' depends on whether the business is in an investment-growth phase or a cost-discipline phase — state which, don't assume."
+    - id: capex_utilization_pct
+      label: "Capex utilisation % (actual vs plan)"
+      formula: "Actual Capex Spend / Planned (Sanctioned) Capex × 100"
+      favourability: neutral
+      presentation: bar_composition
+      gl_refs: [asset_ppe]
+      note: "Under-utilisation can mean either cost discipline OR delayed execution — flag as a question, not a verdict, unless the data states which."
+
+# ----------------------------------------------------------------------------
+# INDUSTRY: Utilities — Indian power Distribution Company ("Discom").
+# See gl_taxonomy.yaml's utilities_discom section for the underlying terms.
+# ----------------------------------------------------------------------------
+utilities_discom:
+  regulatory_performance:
+    - id: atc_loss_pct
+      label: "AT&C loss %"
+      formula: "1 − [(Units billed × Collection efficiency) / Units input] × 100"
+      favourability: cost
+      presentation: line
+      gl_refs: [discom_atc_loss]
+      note: "The single most-tracked Discom efficiency KPI — almost always belongs on a trend line in a regulatory/board deck, not just a period snapshot."
+    - id: collection_efficiency_pct
+      label: "Collection efficiency %"
+      formula: "Amount collected / Amount billed × 100"
+      favourability: revenue
+      presentation: line
+      gl_refs: [discom_collection_efficiency]
+      note: null
+    - id: acs_acoe_gap
+      label: "ACS-ACoE gap (₹/kWh or local currency per unit)"
+      formula: "Average Cost of Supply per unit − Average revenue Realised per unit"
+      favourability: cost
+      presentation: line
+      gl_refs: [discom_power_purchase, discom_arr]
+      note: "A POSITIVE, widening gap means the Discom recovers less per unit than it costs to supply — a core regulatory/financial-health signal, usually the single most important number in a Discom board deck."
+    - id: revenue_gap
+      label: "Revenue gap (ARR vs actual realised revenue)"
+      formula: "Approved ARR − Actual revenue realised"
+      favourability: revenue
+      presentation: driver_bar
+      gl_refs: [discom_arr]
+      note: "Often reconciled later via a regulatory 'true-up' — worth noting that a gap isn't necessarily a permanent loss."
+    - id: power_purchase_cost_ratio
+      label: "Power purchase cost as % of total cost"
+      formula: "Power Purchase Cost / Total Operating Cost × 100"
+      favourability: cost
+      presentation: bar_composition
+      gl_refs: [discom_power_purchase]
+      note: "Usually 70-80%; a shift of even 2-3 points here typically outweighs every other opex variance combined — say so explicitly if it's the largest mover."
+    - id: rab_growth_pct
+      label: "Regulatory Asset Base growth %"
+      formula: "(Closing RAB − Opening RAB) / Opening RAB × 100"
+      favourability: neutral
+      presentation: line
+      gl_refs: [discom_rab]
+      note: "Explain growth via the REGULATORY mechanism (approved capex feeding the allowed asset base / ARR), not generic balance-sheet framing."

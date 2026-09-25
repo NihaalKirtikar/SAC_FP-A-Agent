@@ -1,0 +1,22 @@
+[theme]
+# Dark-primary theme (GN Productivity Hub / gn-playbook-ui dark palette), pinned
+# as the ONLY theme (no [theme.dark] variant) so it never depends on — or
+# fights with — the OS/browser light/dark preference. See app.py's THEME_CSS
+# for the matching hand-styled surfaces (cards, hero, sidebar, shadow-to-glow)
+# that this base palette alone can't express.
+base = "dark"
+primaryColor = "#A100FF"
+backgroundColor = "#1A0030"
+secondaryBackgroundColor = "#2D0050"
+textColor = "#F1E9F8"
+borderColor = "#3D006E"
+linkColor = "#EBD9FF"
+showWidgetBorder = true
+baseRadius = "11px"
+
+[theme.sidebar]
+backgroundColor = "#150026"
+secondaryBackgroundColor = "#22003D"
+textColor = "#F1E9F8"
+primaryColor = "#E6007E"
+borderColor = "#3D006E"

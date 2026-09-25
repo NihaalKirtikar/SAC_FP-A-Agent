@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sac-fpa-agent",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile", "-Command",
+        "Set-Location -LiteralPath 'C:\\Claude_Code\\SAC FP&A Agent'; .\\.venv\\Scripts\\streamlit.exe run app.py --server.port 8503 --server.headless true --browser.gatherUsageStats false"
+      ],
+      "port": 8503
+    }
+  ]
+}
